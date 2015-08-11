@@ -1,4 +1,5 @@
-#include "omath.h"
+//#include "omath.h"
+#include <math.h>
 
 typedef struct vector {
 	float m, d;

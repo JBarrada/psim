@@ -34,11 +34,10 @@ float atan(float x) {
 	return (sin(M_PId2-x) / sin(x));
 }
 
-float sqrt(float n)
-{
+float sqrt(float n) {
   float x = n;
   float y = 1;
-  float e = 0.000000001;
+  float e = 0.000001;
   while(x - y > e) {
     x = (x + y)/2;
     y = n/x;
