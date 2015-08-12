@@ -1,12 +1,14 @@
 //#include "omath.h"
 #include <math.h>
 
+//#define SN 0.00000001
+
 typedef struct vector {
-	float m, d;
+	double m, d;
 } vector;
 
 typedef struct point {
-	float x, y;
+	double x, y;
 } point;
 
 point cast_point(vector *a) {
@@ -33,10 +35,10 @@ vector vsub(vector *a, vector *b) {
 	return cast_vector(&p_a);
 }
 
-float vvmult(vector *a, vector *b) { // might need to find greater direction
+double vvmult(vector *a, vector *b) { // might need to find greater direction
 	return (a->m*b->m*cos(a->d-b->d));
 }
 
-vector vsmult(vector *v, float s) {
+vector vsmult(vector *v, double s) {
 	return (vector){v->m*s, v->d};
 }
