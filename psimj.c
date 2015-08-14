@@ -1,5 +1,6 @@
 #include <GL/gl.h>
-#include <GL/glut.h>
+#include <GL/freeglut.h>
+#include <GL/glext.h>
 #include <time.h>
 
 #include <stdio.h>
@@ -16,23 +17,17 @@ typedef struct particle particle;
 
 struct particle {
 	vector pos;
-	//vector pos_prev;
 	vector vel;
+	vector vel_prev;
 	particle* neighbors[MAXP];
 };
 
-const double radius = 2; // max distance particles affect each other
+const double radius = .5; // max distance particles affect each other
 
 const double scale = 1;
-/*
-const double c_radius = 1.0; // distance from wall that counts as collision
-const double r_density = 0.5; // rest density
-const double l_d_velocity = 0.1; // viscosity's linear dependence on velocity
-const double q_d_velocity = 0.1; // viscosity's quadratic dependence on velocity
-const double k = 0.1; // stiffness used in double_density_relax
-const double k_near = 0.1; // near-stiffness used in double_density_relax
-*/
-vector gravity = {.5, -M_PI/2};
+vector gravity = {.01, -M_PI/2};
+
+vector mousepoint = {0,0};
 
 particle particles[MAXP];
 
@@ -57,21 +52,36 @@ void update_neighbors() {
 void apply_external_forces() {
 	int i;
 	for (i=0; i<MAXP; i++) {
-		particles[i].vel = vadd(&particles[i].vel, &gravity);
+		//particles[i].vel = vadd(&particles[i].vel, &gravity);
+		
+		vector direction = vsub(&mousepoint, &particles[i].pos);
+		direction.m = gravity.m;
+		
+		particles[i].vel = vadd(&particles[i].vel, &direction);
 	}
 }
 
 void do_math() {
 	int i, n;
 	
-	double neighbor_effect = 0.1;
+	double neighbor_effect = .5;
+	double pressure_effect = .0004;
 	
 	for (i=0; i<MAXP; i++) {
 		for (n=0; n<MAXP; n++) {
 			if (particles[i].neighbors[n]) {
 				vector from_neighbor = vsub(&particles[i].pos, &particles[i].neighbors[n]->pos);
-				from_neighbor.m *= neighbor_effect;
-				particles[i].vel = vadd(&particles[i].vel, &from_neighbor);
+				from_neighbor.m = (radius - from_neighbor.m)/radius;
+				
+				vector neighbor_vel = particles[i].neighbors[n]->vel_prev;
+				
+				neighbor_vel.m *= (from_neighbor.m*pressure_effect);
+				
+				vector final_vector = vadd(&from_neighbor, &neighbor_vel);
+				
+				final_vector.m *= neighbor_effect;
+				particles[i].vel = vadd(&particles[i].vel, &final_vector);
+				particles[i].vel.m *= 0.99;
 			}
 			else {
 				break;
@@ -80,16 +90,32 @@ void do_math() {
 	}
 }
 
+void universe() {
+	int i, n;
+	
+	double neighbor_effect = 0.000001;
+	
+	for (i=0; i<MAXP; i++) {
+		for (n=0; n<MAXP; n++) {
+			vector from_neighbor = vsub(&particles[i].pos, &particles[n].pos);
+			//from_neighbor.m = 1/from_neighbor.m;
+			from_neighbor.m *= neighbor_effect;
+			particles[i].vel = vadd(&particles[i].vel, &from_neighbor);
+		}
+	}
+}
+
 void advance_particles() {
 	int i;
 	for (i=0; i<MAXP; i++) {
-		//particles[i].vel.m *= scale;
+		particles[i].vel.m *= 0.9;
 		particles[i].pos = vadd(&particles[i].pos, &particles[i].vel);
+		particles[i].vel_prev = particles[i].vel;
 	}
 }
 
 void resolve_collisions() {
-	double friction = 0.2;
+	double friction = 0.9;
 	
 	int i;
 	double distance;
@@ -113,6 +139,12 @@ void resolve_collisions() {
 			normal = (vector) {1, M_PI/2};
 		}
 		
+		//bottom
+		if (HEIGHT-p_pos.y < distance) {
+			distance = HEIGHT-p_pos.y;
+			normal = (vector) {1, -M_PI/2};
+		}
+		
 		if (distance < radius) {
 			double projection = vvmult(&particles[i].vel, &normal);
 			vector scaled = vsmult(&normal, 2*projection);
@@ -126,39 +158,11 @@ void resolve_collisions() {
 
 void update() {
 	apply_external_forces();
-	//do_math();
-	resolve_collisions();
+	do_math();
+	//universe();
+	//resolve_collisions();
 	advance_particles();
 	update_neighbors();
-}
-
-int is_particle_here(double x, double y) {
-	point current = {x, y};
-	vector current_v = cast_vector(&current);
-	int i;
-	for (i=0; i<MAXP; i++) {
-		vector sub = vsub(&particles[i].pos, &current_v);
-		if (sub.m<=0.25){
-			return 1;
-		}
-	}
-	return 0;
-}
-void draw() {
-	double y, x;
-	
-	printf("--------------------|\n");
-	for (y=HEIGHT-1; y>=0; y-=.5) {
-		for (x=0; x<WIDTH; x+=.5) {
-			if (is_particle_here(x, y)) {
-				printf("0");
-			}
-			else {
-				printf(" ");
-			}
-		}
-		printf("|\n");
-	}
 }
 
 void debug(char * msg) {
@@ -171,8 +175,51 @@ void debug(char * msg) {
 	printf("\n");
 }
 
+void set_pixel(int x, int y, unsigned char c) {
+	if (x<400 & y<400 & x>=0 & y>=0) {
+		screenbuf[y*400+x] = c;
+	}	
+}
+
+void draw_line(int x1,int y1,int x2,int y2, unsigned char c) {
+	double dx, dy;
+	dx = (x2-x1);
+	dy = (y2-y1);
+	
+	int i;
+	if (abs(dx) > abs(dy)) {
+		double slope = dy/dx;
+		for (i=0; i!=dx; i+=(dx>0)?1:-1) {
+			set_pixel(i+x1, slope*i+y1, c);
+		}
+	}
+	else {
+		double slope = dx/dy;
+		for (i=0; i!=dy; i+=(dy>0)?1:-1) {
+			set_pixel(slope*i+x1, i+y1, c);
+		}
+	}
+}
+
+void draw_circle(int cx, int cy, double r) {
+	int i;
+	double x, y;
+	for (i=0; i<40; i++) {
+		x = r * cos(((M_PI/2)/40)*i);
+		y = r * sin(((M_PI/2)/40)*i);
+		
+		set_pixel(cx+x, cy+y, 0xff);
+		set_pixel(cx-x, cy+y, 0xff);
+		set_pixel(cx+x, cy-y, 0xff);
+		set_pixel(cx-x, cy-y, 0xff);
+	}
+}
+
 void draw_gl() {
 	memset(screenbuf, 0, 400*400);
+	
+	point gravpoint = cast_point(&gravity);
+	draw_line(200,200, 200+gravpoint.x*1000, 200+gravpoint.y*1000, 0xE0);
 	
 	int i;
 	for (i=0; i<MAXP; i++) {
@@ -182,9 +229,8 @@ void draw_gl() {
 		x = particle_pos.x * (400.0/WIDTH);
 		y = particle_pos.y * (400.0/HEIGHT);
 		
-		if (x<400 & y<400 & x>=0 & y>=0) {
-			screenbuf[y*400+x] = 0xff;
-		}	
+		draw_circle(x, y, radius*(400.0/WIDTH)/2);
+		//set_pixel(x, y, 0xff);
 	}
 	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -196,7 +242,19 @@ void test_function() {
 	update();
 	
 	draw_gl();
-	usleep(80000);
+	usleep(10000);
+}
+
+void keybd(unsigned char key, int x, int y) {
+	point mouse_now = {(x/400.0)*WIDTH, HEIGHT-((y/400.0)*HEIGHT)};
+	mousepoint = cast_vector(&mouse_now);
+	
+	if (key == 97) {
+		gravity.d -= M_PI/20; 
+	}
+	else if (key == 100) {
+		gravity.d += M_PI/20; 
+	}
 }
 
 void main() {
@@ -211,22 +269,6 @@ void main() {
 	
 	memset(screenbuf, 0, 400*400);
 	
-	//particles[0].pos = cast_vector(&(point){10, 10});
-	//particles[1].pos = cast_vector(&(point){11, 9.8});
-	
-	/*
-	draw();
-	getchar();
-	
-	for (i=0; i<30; i++) {
-		update();
-	
-		draw();
-		debug("");
-		getchar();
-	}*/
-	
-	
 	
 	char fakeParam[] = "";
 	char *fakeargv[] = { fakeParam, NULL };
@@ -237,6 +279,8 @@ void main() {
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
 	glutCreateWindow("!");
 	glutIdleFunc(test_function);
+	glutDisplayFunc(draw_gl);
+	glutKeyboardFunc(keybd);
 
 	glutMainLoop();
 }

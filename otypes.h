@@ -16,7 +16,12 @@ point cast_point(vector *a) {
 }
 
 vector cast_vector(point *a) {
-	return (vector){sqrt((a->x*a->x)+(a->y*a->y)), atan(a->y/a->x)};
+	if (a->x < 0){
+		return (vector){sqrt((a->x*a->x)+(a->y*a->y)), atan(a->y/a->x) + M_PI};
+	}
+	else {
+		return (vector){sqrt((a->x*a->x)+(a->y*a->y)), atan(a->y/a->x)};
+	}
 }
 
 vector vadd(vector *a, vector *b) {
