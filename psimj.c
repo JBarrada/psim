@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include "otypes.h"
 
-#define MAXP 100
+#define MAXP 200
 
 #define HEIGHT 20
 #define WIDTH 20
@@ -22,10 +22,10 @@ struct particle {
 	particle* neighbors[MAXP];
 };
 
-const double radius = .6; // max distance particles affect each other
+const double radius = .4; // max distance particles affect each other
 
 const double scale = 1;
-vector gravity = {.001, -M_PI/2};
+vector gravity = {.01, -M_PI/2};
 
 vector mousepoint = {0,0};
 
@@ -52,19 +52,19 @@ void update_neighbors() {
 void apply_external_forces() {
 	int i;
 	for (i=0; i<MAXP; i++) {
-		particles[i].vel = vadd(&particles[i].vel, &gravity);
+		//particles[i].vel = vadd(&particles[i].vel, &gravity);
 		
-		//vector direction = vsub(&mousepoint, &particles[i].pos);
-		//direction.m = gravity.m;
+		vector direction = vsub(&mousepoint, &particles[i].pos);
+		direction.m = gravity.m;
 		
-		//particles[i].vel = vadd(&particles[i].vel, &direction);
+		particles[i].vel = vadd(&particles[i].vel, &direction);
 	}
 }
 
 void do_math() {
 	int i, n;
 	
-	double neighbor_effect = .5;
+	double neighbor_effect = .4;
 	double pressure_effect = .0004;
 	
 	for (i=0; i<MAXP; i++) {
@@ -73,11 +73,13 @@ void do_math() {
 				vector from_neighbor = vsub(&particles[i].pos, &particles[i].neighbors[n]->pos);
 				from_neighbor.m = (radius - from_neighbor.m)/radius;
 				
-				vector neighbor_vel = particles[i].neighbors[n]->vel_prev;
+				//vector neighbor_vel = particles[i].neighbors[n]->vel_prev;
 				
-				neighbor_vel.m *= (from_neighbor.m*pressure_effect);
+				//neighbor_vel.m *= (from_neighbor.m*pressure_effect);
 				
-				vector final_vector = vadd(&from_neighbor, &neighbor_vel);
+				//vector final_vector = vadd(&from_neighbor, &neighbor_vel);
+				
+				vector final_vector = from_neighbor;
 				
 				final_vector.m *= neighbor_effect;
 				particles[i].vel = vadd(&particles[i].vel, &final_vector);
@@ -330,7 +332,6 @@ int orientation(point p, point q, point r) {
     return (val > 0)? 1: 2; // clock or counterclock wise
 }
 
-
 void bubble_sort(vector list_actual[], long n, vector list[]) {
 	long c, d;
 	vector temp;
@@ -386,7 +387,7 @@ void convex_hull(point points[], int n) {
     {
         if (next[i] != -1) {
 			//printf("p x:%f y:%f\n", points[i].x, points[i].y);
-			draw_circle(points[i].x, points[i].y, 5, 0x1c);
+			//draw_circle(points[i].x, points[i].y, 5, 0x1c);
 		}
     }
 	
@@ -412,9 +413,28 @@ void convex_hull(point points[], int n) {
 		vectors[i] = cast_vector(&results[i]);
 	}
 	
+	
+	//find centeer
+	double cx = 0, cy = 0;
+	
+	point part_pos;
+	for (i=0; i<n_result; i++) {
+		cx += results[i].x;
+		cy += results[i].y;
+	}
+
+	cx /= n_result;
+	cy /= n_result;
+	
+	part_pos.x = cx;
+	part_pos.y = cy;
+	
+	vector compare = cast_vector(&part_pos);
+	
+	
 	vector vect_comp[n_result];
 	for (i=0;i<n_result;i++){
-		vect_comp[i] = vsub(&vectors[0], &vectors[i]);
+		vect_comp[i] = vsub(&compare, &vectors[i]);
 	}
 	
 	bubble_sort(vectors, n_result, vect_comp);
@@ -427,7 +447,12 @@ void convex_hull(point points[], int n) {
 			point lll = cast_point(&vectors[i-1]);
 			draw_line(lll.x, lll.y, ppp.x, ppp.y, 0x1c);
 		}
-    }
+		else {
+			point ppp = cast_point(&vectors[i]);
+			point lll = cast_point(&vectors[n_result-1]);
+			draw_line(lll.x, lll.y, ppp.x, ppp.y, 0x1c);
+		}
+	}
 }
 
 void draw_gl() {
@@ -449,7 +474,7 @@ void draw_gl() {
 		
 		points[i]= (point){x, y};
 		
-		draw_circle(x, y, radius*(400.0/WIDTH)/2, 0xff);
+		draw_circle(x, y, radius*(400.0/WIDTH)/2, 0x01);
 	}
 	
 	
@@ -466,7 +491,7 @@ void test_function() {
 	update();
 	
 	draw_gl();
-	usleep(10000);
+	//usleep(10000);
 }
 
 void keybd(unsigned char key, int x, int y) {
@@ -485,7 +510,7 @@ void main() {
 	int y, x, i=0;
 	
 	for (y=0; y<10; y++) {
-		for (x=0; x<10; x++) {
+		for (x=0; x<20; x++) {
 			particles[i].pos = cast_vector(&(point){(x/4.0)+5, (y/4.0)+10});
 			i++;
 		}
