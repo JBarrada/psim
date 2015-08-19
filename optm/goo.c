@@ -3,7 +3,7 @@
 
 #include "otypes.h"
 
-#define MAXP 2
+#define MAXP 400
 
 typedef struct particle particle;
 struct particle {
@@ -22,7 +22,7 @@ typedef struct collision {
 
 particle particles[MAXP];
 
-const double radius = 1;
+const double radius = .6;
 
 #include "gfx.c"
 
@@ -71,11 +71,11 @@ void update_neighbors() {
 void apply_external_forces() {
 	int i;
 	for (i=0; i<MAXP; i++) {
-		//vector direction = vsub(&focalvector, &particles[i].pos);
-		//direction.m = 0.01;
-		//particles[i].vel = vadd(&particles[i].vel, &direction);
+		vector direction = vsub(&focalvector, &particles[i].pos);
+		direction.m = 0.01;
+		particles[i].vel = vadd(&particles[i].vel, &direction);
 		
-		particles[i].vel = vadd(&particles[i].vel, &gravity);
+		//particles[i].vel = vadd(&particles[i].vel, &gravity);
 	}
 }
 
@@ -106,7 +106,7 @@ void do_math() {
 void advance_particles() {
 	int i;
 	for (i=0; i<MAXP; i++) {
-		particles[i].vel.m *= 0.98;
+		particles[i].vel.m *= 0.96;
 		particles[i].pos = vadd(&particles[i].pos, &particles[i].vel);
 		
 		particles[i].posxy = cast_point(&particles[i].pos);
@@ -121,8 +121,8 @@ collision get_nearest(point p) {
 	normal = (vector) {1, 0};
 	
 	//right
-	if ((WIDTH_G/1)-p.x < distance) {
-		distance = (WIDTH_G/1)-p.x;
+	if ((WIDTH_G/2)-p.x < distance) {
+		distance = (WIDTH_G/2)-p.x;
 		normal = (vector) {1, M_PI};
 	}
 	
@@ -167,10 +167,14 @@ void resolve_collisions() {
 			//printf("OUT M: %f\n", particles[i].vel);
 			vector newpos = vadd(&particles[i].vel, &particles[i].pos);
 			c = get_nearest(cast_point(&newpos));
-			c.normal.m = radius-c.distance;
+			c.normal.m = (radius-c.distance) + 0.01;
 			if (c.distance < radius) {
-				printf("SUPPLEMENT #%d dist:%f\n", i, c.distance);
+				point prev = cast_point(&particles[i].pos);
+				//printf("SUPPLEMENT #%d dist:%f  y: %f to ", i, c.distance, prev.y);
 				particles[i].pos = vadd(&particles[i].pos, &c.normal);
+				newpos = vadd(&particles[i].vel, &particles[i].pos);
+				prev = cast_point(&newpos);
+				//printf("y: %f\n", prev.y);
 			}
 			
 			if (particles[i].vel.m < .06) {
@@ -183,7 +187,7 @@ void resolve_collisions() {
 void update() {
 	apply_external_forces();
 	do_math();
-	resolve_collisions();
+	//resolve_collisions();
 	advance_particles();
 	//printf("m: %f       y: %f\n\n",particles[0].vel, particles[0].posxy.y);
 	update_neighbors();
@@ -199,28 +203,28 @@ void test_function() {
     //printf("%f mS\n", ((double)(toc - tic) / CLOCKS_PER_SEC)*1000);
 	
 	render();
-	//usleep(10000);
+	usleep(10000);
 }
 
 void main() {
 	focalvector = cast_vector(&focalpoint);
 	
 	int y, x, i=0;
-	/*
-	for (y=0; y<10; y++) {
-		for (x=0; x<50; x++) {
-			particles[i].pos = cast_vector(&(point){(x/4.0)+5, (y/4.0)+10});
+	
+	for (y=0; y<20; y++) {
+		for (x=0; x<20; x++) {
+			particles[i].pos = cast_vector(&(point){(x*radius)+5, (y*radius)+10});
 			i++;
 		}
 	}
-	*/
-	particles[0].pos = cast_vector(&(point){32, 24});
+	
+	//particles[0].pos = cast_vector(&(point){32, 24});
 	//particles[0].vel = (vector){2, -M_PI/2};
 	
-	particles[1].pos = cast_vector(&(point){64-8, 8});
+	//particles[1].pos = cast_vector(&(point){64-8, 8});
 	////particles[1].vel = (vector){0.6, M_PI};
-	particles[1].vel = vsub(&focalvector, &particles[1].pos);
-	particles[1].vel.m = 0.8;
+	//particles[1].vel = vsub(&focalvector, &particles[1].pos);
+	//particles[1].vel.m = 0.8;
 	
 
 	char fakeParam[] = "";
