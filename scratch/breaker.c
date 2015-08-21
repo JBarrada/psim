@@ -176,9 +176,44 @@ void resolve_friction(manifold *m) {
 	tangent.m /= tangent.m;
 	
 	double jt = -vvmult(&rv, &tangent);
-	jt /= (m->a->inv_mass + m->b->inv_mass);
 	
-	double mu = 
+	double contact_a_t = vvmult(&m->a_contact, &tangent);
+	contact_a_t *= contact_a_t;
+	contact_a_t /= m->a->m_inertia;
+	double contact_b_t = vvmult(&m->b_contact, &tangent);
+	contact_b_t *= contact_b_t;
+	contact_b_t /= m->b->m_inertia;
+	
+	if (m->a->m_inertia == 0) {
+		contact_a_t = 0;
+	}
+	if (m->b->m_inertia == 0) {
+		contact_b_t = 0;
+	}
+	
+	//jt /= (m->a->inv_mass + m->b->inv_mass);
+	jt /= (m->a->inv_mass + m->b->inv_mass + contact_a_t + contact_b_t);
+	//printf("%f\n", contact_b_t);
+	
+	double mu = sqrt((m->a->sf*m->a->sf) + (m->b->sf*m->b->sf));
+	
+	vector friction_impulse;
+	if (abs(jt) < (jt*mu)) {
+		friction_impulse = vsmult(&tangent, jt);
+	}
+	else {
+		double dynamic_friction = sqrt((m->a->df*m->a->df) + (m->b->df*m->b->df));
+		friction_impulse = vsmult(&tangent, -jt*dynamic_friction);
+	}
+	
+	vector a_accel = vsmult(&friction_impulse, m->a->inv_mass);
+	vector b_accel = vsmult(&friction_impulse, m->b->inv_mass);
+
+	m->a->vel = vadd(&m->a->vel, &a_accel);
+	m->b->vel = vsub(&m->b->vel, &b_accel);
+	
+	m->a->angular_vel += (1 / m->a->m_inertia) * vvmult(&a_accel, &m->a_contact);
+	m->b->angular_vel += (1 / m->b->m_inertia) * vvmult(&b_accel, &m->b_contact);
 }
 
 void resolve_collision(manifold *m) {
@@ -196,7 +231,7 @@ void resolve_collision(manifold *m) {
 		vector impulse = vsmult(&m->normal, j);
 		vector a_accel = vsmult(&impulse, m->a->inv_mass);
 		vector b_accel = vsmult(&impulse, m->b->inv_mass);
-
+		
 		m->a->vel = vsub(&m->a->vel, &a_accel);
 		m->b->vel = vadd(&m->b->vel, &b_accel);
 		
